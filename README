@@ -1,0 +1,240 @@
+ Nume: Margineanu Nicolae-Vladut
+ Grupă: 333CA
+
+ Tema 2 ASC - Tehnici de Optimizari
+ 
+ Matricile sunt alocate dinamic, astfel folosim matrici liniarizate pentru a fi
+ stocate continuu in memorie (vector bidimensional in limbajul C, salvat in
+ row-major).
+
+ 1. Implementarea variantei blas
+
+  In rezolvarea metodei blas, am folosit functia cblas_dtrmm. DTRMM - efectueaza
+ o operatie matrix-matrix. B: = alpha * op (A) * B, sau B: = alpha * B * op (A),
+ ALPHA  - DOUBLE PRECISION.
+  Am realizat inmultirile pe bucati, dupa cum urmeaza:
+ B * At, unde At este matricea A transpusa. Matricea At este inferior
+ triunghiulara. Rezultatul este salvat in matricea D.
+ A * A, in care am salvat rezultatul in matricea A_square. A_square * B,
+ unde A_square este superior triunghiulara, rezultatul fiind salvat in matricea
+ B. La final am realizat adunarea dintre matricea D si B, rezulttaul fiind
+ salvat in matricea C.
+
+ Timpul de executie pe coada ibm-nehalem.q:
+ BLAS SOLVER
+ Run=./tema2_blas: N=400: Time=0.029315
+ BLAS SOLVER
+ Run=./tema2_blas: N=800: Time=0.206276
+ BLAS SOLVER
+ Run=./tema2_blas: N=1200: Time=0.665315
+
+
+ 2. Implementarea variantei neopt
+ 
+  In rezolvarea metodei neopt, am realizat inmultirile pe bucati, dupa cum
+ urmeaza:
+  B * At, unde At este transpusa matricei A superior triunghiulara. At este o
+ matrice inferior triunghiulara. La aceasta inmultire, am tinut cont de
+ proprietatea matricei At, evitand inmultirile cu 0, care adunate la suma nu
+ modificau rezultatul. Astfel, matricea At fiind in drepta B * At, indicele k
+ pleaca de la j. Rezultatul este salvat in matricea D.
+  A * A, unde A este superior triunghiulara. Astfel, am parcurs doar elementele
+ de deasupra diagonalei principale, inclusiv diagonala. Rezultatul este salvat
+ inmatricea A_square.
+  A_square * B, unde A_square este o matrice superior triunghiulara. Folosind
+ aceasta proprietate, evitam inmultirile cu 0 care nu modifica rezultatul.
+  Astfel, k pleaca de la i, A_square fiind in dreapta. Rezultatul este salvat in
+ matricea E, rezultatul fiind salvat in matricea C.
+  La final am realizat adunarea dintre matricile D si E.
+ 
+ Timpul de executie pe coada ibm-nehalem.q:
+ NEOPT SOLVER
+ Run=./tema2_neopt: N=400: Time=0.911889
+ NEOPT SOLVER
+ Run=./tema2_neopt: N=800: Time=7.025983
+ NEOPT SOLVER
+ Run=./tema2_neopt: N=1200: Time=22.828592
+ 
+ 3. Implementarea variantei opt_m
+
+  In rezolvarea metodei neopt, am realizat inmultirile pe bucati. Accesele la
+ vectori sunt scumpe din punctul de vedere al performantelor, fiecare acces
+ presupune doua adunari si o inmultire. Astfel, pentru sporirea vitezei am
+ renuntat la accesele vectoriale prin derefentiere, utilizand in acest scop
+ pointeri.  Practic am calculat “de mana” adresa in cadrul vectorului pentru
+ fiecare pointer. Pentru a trece la urmatoarea coloana am adunat cu N pointer-ul.
+ Pointerii sunt de tip double, incrementarea se realizeaza cu 8 bytes. Codul
+ este mult mai dificil de urmarit in urma folosirii acestora. O alta optimizare
+ este folosirea unei constante de tip register in bucla interioara k. Calculele
+ sunt dupa cum urmeaza:
+  B * At, unde At este transpusa matricei A superior triunghiulara. At este o
+ matrice inferior triunghiulara. La aceasta inmultire, am tinut cont de
+ proprietatea matricei At, evitand inmultirile cu 0, care adunate la suma nu
+ modificau rezultatul. Astfel, matricea At fiind in drepta B * At, indicele k
+ pleaca de la j. Pointerii sunt modificati de mana astfel: pentru matricea din
+ stanga, se aduna pointeru cu j, iar pentru matricea din dreapta se aduna cu N * j.
+ Rezultatul este salvat in matricea D. Matricea At am calculat-o separat pentru
+ a putea fi parcursa pe linii, timpul de acces la elemente fiind mai mic. 
+  A * A, unde A este superior triunghiulara. Astfel, am parcurs doar elementele
+ de deasupra diagonalei principale, inclusiv diagonala. Rezultatul este salvat
+ inmatricea A_square.
+  A_square * B, unde A_square este o matrice superior triunghiulara. Folosind
+ aceasta proprietate, evitam inmultirile cu 0 care nu modifica rezultatul.
+  Astfel, k pleaca de la i, A_square fiind in dreapta. Pointerii sunt modificati
+ de mana, astfel: pentru matricea din dreapta se aduna pointerul cu i, iar pentru
+ matricea din stanga se aduna pointerul cu N * i. Rezultatul este salvat in 
+ matricea E, rezultatul fiind salvat in matricea C.
+  La final am realizat adunarea dintre matricile D si E.
+  Variantei opt_m are aceeasi complexitate cu cea din varianta neopt.
+ 
+ Timpul de executie pe coada ibm-nehalem.q:
+ OPT SOLVER
+ Run=./tema2_opt_m: N=400: Time=0.462790
+ OPT SOLVER
+ Run=./tema2_opt_m: N=800: Time=3.313178
+ OPT SOLVER
+ Run=./tema2_opt_m: N=1200: Time=10.369200
+ <<< Bonus=No >>>
+
+ 4. Varianta opt_f
+
+ Timpul de executie pe coada ibm-nehalem.q:
+ NEOPT SOLVER
+ Run=./tema2_opt_f: N=400: Time=0.227205
+ NEOPT SOLVER
+ Run=./tema2_opt_f: N=800: Time=1.442437
+ NEOPT SOLVER
+ Run=./tema2_opt_f: N=1200: Time=4.403051
+
+ 5. Implementare opt_f_extra 
+ In implementarea acestei metode, am incercat 2 flaguri de optimizare, si anume:
+ a) ffast-math => Setează opțiunile -fno-math-errno, -funsafe-math-optimization 
+(care permite optimizări pentru aritmetica cu virgula mobila care presupun că
+ argumentele și rezultatele sunt valide și pot încălca standardele IEEE sau ANSI),
+ -finite-math-only, -fno-rounding-math, -fno-signaling-nans și -fcx-range-limited.
+ Această opțiune nu este activată de nicio opțiune -O în afară de -Ofast, deoarece
+ poate duce la o ieșire incorectă pentru programele care depind de o  implementare
+ exactă a IEEE sau a normelor / specificațiilor ISO pentru funcțiile matematice. 
+ Cu toate acestea, poate genera un cod mai rapid pentru  programele care nu
+ necesită garanțiile acestor specificații.
+ 
+ b) funroll-loops => Se 'desfac' buclele al căror număr de iterații poate fi
+ determinat la momentul compilării sau la intrarea în buclă. Elimina complet
+ buclele cu un număr mic constant de iterații. Această opțiune face ca codul
+ să fie mai mare și poate sau nu să-l facă să funcționeze mai repede. 
+ Compilatorul decide, în mod euristic, ce bucle să se deruleze.
+
+ Timpul de executie pe coada ibm-nehalem.q, unde EXTRA_OPT_CFLAGS=-ffast-math:
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=400: Time=0.202181
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=800: Time=1.340004
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=1200: Time=4.116868
+
+ Timpul de executie pe coada ibm-nehalem.q, unde EXTRA_OPT_CFLAGS=-funroll-loops:
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=400: Time=0.209516
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=800: Time=1.410114
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=1200: Time=4.308364
+
+ Timpul de executie pe coada ibm-nehalem.q, unde EXTRA_OPT_CFLAGS=-ffast-math
+ -funroll-loops
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=400: Time=0.197334
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=800: Time=1.261117
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=1200: Time=4.062485
+
+ Se observa ca pentru folosirea impreuna a celor doua flag-uri avem o performanta
+ mai buna, decat folosirea acestora separat.
+
+ 6. Analiza comparativa a performantei
+
+ a) Metoda blas
+ Grafic pentru valorile urmatoare:
+ BLAS SOLVER
+ Run=./tema2_blas: N=400: Time=0.029415
+ BLAS SOLVER
+ Run=./tema2_blas: N=600: Time=0.090737
+ BLAS SOLVER
+ Run=./tema2_blas: N=800: Time=0.206641
+ BLAS SOLVER
+ Run=./tema2_blas: N=1000: Time=0.392481
+ BLAS SOLVER
+ Run=./tema2_blas: N=1200: Time=0.666339
+ 
+ b) Metoda neopt
+ Grafic pentru valorile urmatoare:
+ NEOPT SOLVER
+ Run=./tema2_neopt: N=400: Time=0.922059
+ NEOPT SOLVER
+ Run=./tema2_neopt: N=600: Time=2.968118
+ NEOPT SOLVER
+ Run=./tema2_neopt: N=800: Time=7.064523
+ NEOPT SOLVER
+ Run=./tema2_neopt: N=1000: Time=13.203243
+ NEOPT SOLVER
+ Run=./tema2_neopt: N=1200: Time=22.888781
+
+ c) Metoda opt_m
+ Grafic pentru valorile urmatoare:
+ OPT SOLVER
+ Run=./tema2_opt_m: N=400: Time=0.464267
+ OPT SOLVER
+ Run=./tema2_opt_m: N=600: Time=1.514952
+ OPT SOLVER
+ Run=./tema2_opt_m: N=800: Time=3.369658
+ OPT SOLVER
+ Run=./tema2_opt_m: N=1000: Time=5.986207
+ OPT SOLVER
+ Run=./tema2_opt_m: N=1200: Time=10.443977
+
+ d) Metoda opt_f
+ Grafic pentru valorile urmatoare:
+ NEOPT SOLVER
+ Run=./tema2_opt_f: N=400: Time=0.217916
+ NEOPT SOLVER
+ Run=./tema2_opt_f: N=600: Time=1.043596
+ NEOPT SOLVER
+ Run=./tema2_opt_f: N=800: Time=1.461430
+ NEOPT SOLVER
+ Run=./tema2_opt_f: N=1000: Time=2.606664
+ NEOPT SOLVER
+ Run=./tema2_opt_f: N=1200: Time=4.480869
+
+ e) Metoda opt_f_extra
+ Grafic pentru valorile urmatoare:
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=400: Time=0.188519
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=600: Time=0.516920
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=800: Time=1.224562
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=1000: Time=2.320713
+ NEOPT SOLVER
+ Run=./tema2_opt_f_extra: N=1200: Time=4.087400
+
+  In urma graficelor realizate in octave, solutiile cele mai performante sunt
+ in aceasta ordine: blas, opt_f_extra, opt_f, opt_m si neopt. 
+  Se observa din grafic ca flagurile pentru compilator din opt_f_extra aduc o
+ optimizare buna: ffast-math si funroll-loops. Pentru operatiile aritmetice cu
+ virgula mobila si pentru desfacerea buclelor, unde se elimina complet
+ buclele cu un număr mic constant de iterații. Ceea ce in opt_f nu se intampla
+ aceste optimizari si necesita un timp mai mare in realizarea operatiilor
+ aritmetice si in parcurgerea tuturor buclelor.
+
+   Bibliografie
+ - Laboratorul 5 ASC
+ [https://ocw.cs.pub.ro/courses/asc/laboratoare/05]
+ - Options That Control Optimization
+ [https://gcc.gnu.org/onlinedocs/gcc-5.4.0/gcc/Optimize-Options.html]
+ - BLAS (Basic Linear Algebra Subprograms)
+ [http://www.netlib.org/blas/]
+ [http://www.netlib.org/blas/cblas.h]
+
+
